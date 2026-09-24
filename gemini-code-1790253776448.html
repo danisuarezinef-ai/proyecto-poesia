@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proyecto Poesía — Taller de Escritura</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      padding: 0.8rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      background: #020617;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.1rem; color: var(--accent); }
+    .version-tag { font-size: 0.75rem; background: var(--border); padding: 0.2rem 0.5rem; border-radius: 4px; color: var(--muted); }
+    
+    /* Banner de Actualización Interna */
+    #update-banner {
+      display: none;
+      background: #0284c7;
+      color: #fff;
+      padding: 0.6rem 1rem;
+      text-align: center;
+      font-size: 0.9rem;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+    }
+    #update-banner button {
+      background: #fff;
+      color: #0284c7;
+      border: none;
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .layout { display: flex; flex: 1; overflow: hidden; }
+    .editor-container { flex: 1; display: flex; flex-direction: column; padding: 1rem; border-right: 1px solid var(--border); }
+    textarea {
+      flex: 1;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Georgia', serif;
+      font-size: 1.15rem;
+      line-height: 1.8;
+      resize: none;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--accent); }
+
+    .sidebar { width: 320px; background: #090d16; display: flex; flex-direction: column; padding: 1rem; overflow-y: auto; }
+    .selected-badge { background: var(--panel); border: 1px solid var(--border); padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; }
+    .selected-badge .word { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
+    .section-title { font-size: 0.85rem; color: var(--accent); margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.2rem; }
+    .rhyme-list { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .rhyme-item { background: var(--panel); border: 1px solid var(--border); padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+    .rhyme-item:hover { background: var(--accent); color: #000; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Proyecto Poesía — Taller de Escritura</h1>
+    <span class="version-tag">v1.0.0</span>
+  </header>
+
+  <!-- Banner interactivo de actualización interna -->
+  <div id="update-banner">
+    <span>¡Nueva actualización disponible con mejoras!</span>
+    <button id="btn-update">Actualizar ahora</button>
+  </div>
+
+  <div class="layout">
+    <div class="editor-container">
+      <textarea id="editor" placeholder="Escribe tu poema aquí... Haz clic en cualquier palabra para ver sus rimas en el panel lateral."></textarea>
+    </div>
+
+    <div class="sidebar">
+      <div id="inspector">
+        <div style="color: var(--muted); font-style: italic; font-size: 0.85rem; text-align: center; margin-top: 2rem;">
+          Haz clic o selecciona una palabra para buscar sus rimas en el diccionario.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Diccionario Base v1.0 (Español Castellano)
+    const diccionario = [
+      "rosa", "hermosa", "espinosa", "mariposa", "fosa", "prosa", "cosa", "diosa", "furia",
+      "amor", "calor", "dolor", "sabor", "ardor", "flor", "clamor", "temor", "rumor",
+      "alegría", "energía", "melodía", "armonía", "poesía", "día", "vía", "fantasía",
+      "cielo", "anhelo", "desvelo", "vuelo", "hielo", "suelo", "pañuelo",
+      "mar", "cantar", "soñar", "llorar", "volar", "amar", "azar", "lugar", "desear",
+      "vida", "herida", "partida", "caída", "medida", "salida", "querida",
+      "fuego", "juego", "luego", "ruego", "ciego", "sosiego",
+      "luz", "cruz", "tragaluz", "capuz", "andaluz"
+    ];
+
+    function obtenerTerminacion(palabra) {
+      let p = palabra.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
+      if (!p) return { consonante: "", asonante: "" };
+
+      const vocales = ["a", "e", "i", "o", "u"];
+      let uIdx = -1;
+      for (let i = p.length - 1; i >= 0; i--) {
+        if (vocales.includes(p[i])) { uIdx = i; break; }
+      }
+      if (uIdx === -1) return { consonante: p, asonante: p };
+
+      let tIdx = uIdx;
+      if (["n", "s", "a", "e", "i", "o", "u"].includes(p.slice(-1)) && p.length > 2) {
+        for (let i = uIdx - 1; i >= 0; i--) {
+          if (vocales.includes(p[i])) { tIdx = i; break; }
+        }
+      }
+
+      const consonante = p.substring(tIdx);
+      const asonante = consonante.replace(/[^aeiou]/g, "");
+      return { consonante, asonante };
+    }
+
+    function buscarRimas(target) {
+      const { consonante, asonante } = obtenerTerminacion(target);
+      if (!consonante) return { consonantes: [], asonantes: [] };
+
+      const consonantes = [];
+      const asonantes = [];
+      const tLwr = target.toLowerCase().trim();
+
+      for (const w of diccionario) {
+        if (w.toLowerCase() === tLwr) continue;
+        const term = obtenerTerminacion(w);
+        if (term.consonante === consonante) consonantes.push(w);
+        else if (term.asonante === asonante) asonantes.push(w);
+      }
+      return { consonantes, asonantes };
+    }
+
+    const editor = document.getElementById("editor");
+    const inspector = document.getElementById("inspector");
+
+    function actualizarInspector() {
+      const text = editor.value;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      let sel = "";
+
+      if (start !== end) {
+        sel = text.substring(start, end).trim();
+      } else {
+        const left = text.slice(0, start).search(/\S+$/);
+        const right = text.slice(start).search(/\s/);
+        sel = right < 0 ? text.slice(left) : text.slice(left, start + right);
+      }
+
+      sel = sel.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").trim();
+      if (!sel || sel.length < 2) return;
+
+      const { consonantes, asonantes } = buscarRimas(sel);
+      
+      const render = (items) => items.length === 0 
+        ? `<div style="color:var(--muted); font-size:0.8rem;">Sin coincidencias</div>`
+        : `<ul class="rhyme-list">${items.map(w => `<li class="rhyme-item" onclick="insertar('${w}')">${w}</li>`).join("")}</ul>`;
+
+      inspector.innerHTML = `
+        <div class="selected-badge">
+          <div style="font-size:0.7rem; color:var(--muted);">PALABRA MARCADA</div>
+          <div class="word">${sel}</div>
+        </div>
+        <div class="section-title">Rimas Consonantes (${consonantes.length})</div>
+        ${render(consonantes)}
+        <div class="section-title">Rimas Asonantes (${asonantes.length})</div>
+        ${render(asonantes)}
+      `;
+    }
+
+    function insertar(word) {
+      editor.focus();
+      document.execCommand("insertText", false, " " + word);
+    }
+
+    editor.addEventListener("keyup", actualizarInspector);
+    editor.addEventListener("click", actualizarInspector);
+    editor.addEventListener("select", actualizarInspector);
+
+    // Sistema de Actualización Interna con Service Worker
+    if ('serviceWorker' in navigator) {
+      let newWorker;
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              document.getElementById('update-banner').style.display = 'flex';
+            }
+          });
+        });
+      });
+
+      document.getElementById('btn-update').addEventListener('click', () => {
+        if (newWorker) {
+          newWorker.postMessage({ action: 'skipWaiting' });
+        }
+        window.location.reload();
+      });
+    }
+  </script>
+</body>
+</html>
