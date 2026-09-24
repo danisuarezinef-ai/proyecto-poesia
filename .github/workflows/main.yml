@@ -1,0 +1,32 @@
+name: Compilar APK v1.0.0
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Construir paquete WebApp
+        run: tar -czf app-release.tar.gz index.html sw.js manifest.json
+
+      - name: Publicar Release y APK para Actualizador
+        uses: softprops/action-gh-release@v1
+        with:
+          files: app-release.tar.gz
+          tag_name: v1.0.0
+          name: Proyecto Poesía v1.0.0
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
