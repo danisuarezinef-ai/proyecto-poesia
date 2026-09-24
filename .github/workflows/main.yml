@@ -3,6 +3,7 @@ name: Compilar APK v1.0.0
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -11,16 +12,24 @@ jobs:
       - name: Descargar Código
         uses: actions/checkout@v4
 
-      - name: Configurar Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+      - name: Localizar y Mover Archivos a la Raíz
+        run: |
+          echo "Verificando ubicación de archivos..."
+          if [ ! -f index.html ]; then
+            find . -mindepth 2 -name "index.html" -exec cp -f {} . \;
+          fi
+          if [ ! -f sw.js ]; then
+            find . -mindepth 2 -name "sw.js" -exec cp -f {} . \;
+          fi
+          if [ ! -f manifest.json ]; then
+            find . -mindepth 2 -name "manifest.json" -exec cp -f {} . \;
+          fi
+          echo "Archivos asegurados en la raíz."
 
       - name: Construir paquete WebApp
         run: tar -czf app-release.tar.gz index.html sw.js manifest.json
 
-      - name: Publicar Release y APK para Actualizador
+      - name: Publicar Release
         uses: softprops/action-gh-release@v1
         with:
           files: app-release.tar.gz
