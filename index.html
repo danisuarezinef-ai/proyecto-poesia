@@ -71,9 +71,8 @@
     // Directorio local donde se guardará el diccionario
     const rutaDiccionario = path.join(__dirname, 'diccionario.json');
 
-    // URLs de respaldo (main y master)
-    const URL_MAIN = 'https://raw.githubusercontent.com/danisuarezinef-ai/diccionario.json/main/diccionario.json';
-    const URL_MASTER = 'https://raw.githubusercontent.com/danisuarezinef-ai/diccionario.json/master/diccionario.json';
+    // URL exacta del archivo Raw en GitHub
+    const URL_DICCIONARIO_GITHUB = 'https://github.com/danisuarezinef-ai/proyecto-poesia/raw/refs/heads/main/diccionario.json';
 
     const btnDescargar = document.getElementById('btn-descargar');
     const estado = document.getElementById('estado-diccionario');
@@ -94,14 +93,9 @@
       estado.textContent = "Descargando diccionario desde GitHub, por favor espera...";
       estado.style.color = "blue";
 
-      let respuesta = await fetch(URL_MAIN);
-      if (!respuesta.ok) {
-        // Intento de respaldo en rama master si main falla
-        respuesta = await fetch(URL_MASTER);
-      }
-
       try {
-        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status} - No se encontró el archivo en GitHub.`);
+        const respuesta = await fetch(URL_DICCIONARIO_GITHUB);
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status} - No se pudo obtener el archivo.`);
         
         const datos = await respuesta.text();
         fs.writeFileSync(rutaDiccionario, datos, 'utf-8');
@@ -121,7 +115,7 @@
       notification.style.display = 'block';
     });
 
-    // Inicializar comprobación al abrir
+    // Inicializar comprobación
     verificarDiccionario();
   </script>
 </body>
