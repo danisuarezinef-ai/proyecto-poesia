@@ -66,11 +66,16 @@
   <script>
     const fs = require('fs');
     const path = require('path');
-    const https = require('https');
     const { ipcRenderer } = require('electron');
 
     const rutaDiccionario = path.join(__dirname, 'diccionario.json');
-    const URL_DICCIONARIO = 'https://raw.githubusercontent.com/danisuarezinef-ai/proyecto-poesia/main/diccionario.json';
+    
+    // Lista de URLs posibles para asegurar la descarga
+    const URLS_DICCIONARIO = [
+      'https://github.com/danisuarezinef-ai/proyecto-poesia/raw/refs/heads/main/diccionario.json',
+      'https://raw.githubusercontent.com/danisuarezinef-ai/proyecto-poesia/main/diccionario.json',
+      'https://raw.githubusercontent.com/danisuarezinef-ai/proyecto-poesia/main/diccionario'
+    ];
 
     const btnDescargar = document.getElementById('btn-descargar');
     const estado = document.getElementById('estado-diccionario');
@@ -85,48 +90,31 @@
       }
     }
 
-    // Función de descarga usando módulo nativo HTTPS
-    function descargarArchivo(url, rutaDestino) {
-      return new Promise((resolve, reject) => {
-        const solicitar = (urlActual) => {
-          https.get(urlActual, { headers: { 'User-Agent': 'Electron-App' } }, (respuesta) => {
-            // Manejar redirecciones de GitHub
-            if (respuesta.statusCode >= 300 && respuesta.statusCode < 400 && respuesta.headers.location) {
-              solicitar(respuesta.headers.location);
-              return;
-            }
-
-            if (respuesta.statusCode !== 200) {
-              reject(new Error(`Error HTTP ${respuesta.statusCode}`));
-              return;
-            }
-
-            const stream = fs.createWriteStream(rutaDestino);
-            respuesta.pipe(stream);
-
-            stream.on('finish', () => {
-              stream.close(resolve);
-            });
-          }).on('error', (err) => {
-            fs.unlink(rutaDestino, () => {});
-            reject(err);
-          });
-        };
-
-        solicitar(url);
-      });
-    }
-
     btnDescargar.addEventListener('click', async () => {
       estado.textContent = "Descargando diccionario desde GitHub, por favor espera...";
       estado.style.color = "blue";
 
-      try {
-        await descargarArchivo(URL_DICCIONARIO, rutaDiccionario);
+      let exito = false;
+
+      for (const url of URLS_DICCIONARIO) {
+        try {
+          const respuesta = await fetch(url);
+          if (respuesta.ok) {
+            const datos = await respuesta.text();
+            fs.writeFileSync(rutaDiccionario, datos, 'utf-8');
+            exito = true;
+            break;
+          }
+        } catch (e) {
+          console.log("Reintentando con siguiente URL...");
+        }
+      }
+
+      if (exito) {
         estado.textContent = "¡Diccionario descargado y guardado correctamente!";
         estado.style.color = "green";
-      } catch (error) {
-        estado.textContent = "Error durante la descarga: " + error.message;
+      } else {
+        estado.textContent = "Error durante la descarga: No se encontró el archivo en GitHub (404).";
         estado.style.color = "red";
       }
     });
